@@ -44,26 +44,6 @@ public class PokeBotRunnerImpl<T> : PokeBotRunner<T> where T : PKM, new()
         if (Hub.Config.Twitch.DistributionCountDown)
             Hub.BotSync.BarrierReleasingActions.Add(() => Twitch.StartingDistribution(config.MessageStart));
     }
-
-    private void AddYouTubeBot(YouTubeSettings config)
-    {
-        if (string.IsNullOrWhiteSpace(config.ClientID))
-            return;
-        if (YouTube != null)
-            return; // already created
-
-        WinFormsUtil.Alert("Please Login with your Browser");
-        if (string.IsNullOrWhiteSpace(config.ChannelID))
-            return;
-        if (string.IsNullOrWhiteSpace(config.ClientID))
-            return;
-        if (string.IsNullOrWhiteSpace(config.ClientSecret))
-            return;
-
-        YouTube = new YouTubeBot<T>(Hub.Config.YouTube, Hub);
-        Hub.BotSync.BarrierReleasingActions.Add(() => YouTube.StartingDistribution(config.MessageStart));
-    }
-
     private void AddDiscordBot(string apiToken)
     {
         if (string.IsNullOrWhiteSpace(apiToken))
