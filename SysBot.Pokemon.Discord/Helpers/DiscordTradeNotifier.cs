@@ -1,151 +1,208 @@
 using Discord;
-using Discord.Commands;
 using Discord.WebSocket;
 using PKHeX.Core;
 using System;
 using System.Linq;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using static SysBot.Pokemon.Discord.Helpers.ColorHelper;
+using static PKHeX.Core.AutoMod.Aesthetics;
+using static PKHeX.Core.PKM;
 
-namespace SysBot.Pokemon.Discord;
-
-public class DiscordTradeNotifier<T>(T Data, PokeTradeTrainerInfo Info, int Code, SocketUser Trader, SocketCommandContext Context)
-    : IPokeTradeNotifier<T>
-    where T : PKM, new()
+namespace SysBot.Pokemon.Discord
 {
-    private T Data { get; } = Data;
-    private PokeTradeTrainerInfo Info { get; } = Info;
-    private int Code { get; } = Code;
-    private SocketUser Trader { get; } = Trader;
-    private SocketCommandContext Context { get; } = Context;
-    public Action<PokeRoutineExecutor<T>>? OnFinish { private get; set; }
-    public readonly PokeTradeHub<T> Hub = SysCord<T>.Runner.Hub;
-
-    public void TradeInitialize(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info)
+    public class DiscordTradeNotifier<T> : IPokeTradeNotifier<T> where T : PKM, new()
     {
-        var receive = Data.Species == 0 ? string.Empty : $" ({Data.Nickname})";
-        Trader.SendMessageAsync($"Initializing trade{receive}. Please be ready. Your code is **{Code:0000 0000}**.").ConfigureAwait(false);
-    }
+        private T Data { get; }
+        private PokeTradeTrainerInfo Info { get; }
+        private int Code { get; }
+        private SocketUser Trader { get; }
+        public Action<PokeRoutineExecutor<T>>? OnFinish { private get; set; }
+        public readonly PokeTradeHub<T> Hub = SysCord<T>.Runner.Hub;
 
-    public void TradeSearching(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info)
-    {
-        var name = Info.TrainerName;
-        var trainer = string.IsNullOrEmpty(name) ? string.Empty : $", {name}";
-        Trader.SendMessageAsync($"I'm waiting for you{trainer}! Your code is **{Code:0000 0000}**. My IGN is **{routine.InGameName}**.").ConfigureAwait(false);
-    }
 
-    public void TradeCanceled(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, PokeTradeResult msg)
-    {
-        OnFinish?.Invoke(routine);
-        Trader.SendMessageAsync($"Trade canceled: {msg}").ConfigureAwait(false);
-    }
-
-    public void TradeFinished(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, T result)
-    {
-        OnFinish?.Invoke(routine);
-        var tradedToUser = Data.Species;
-        var message = tradedToUser != 0 ? $"Trade finished. Enjoy your {(Species)tradedToUser}!" : "Trade finished!";
-        Trader.SendMessageAsync(message).ConfigureAwait(false);
-        if (result.Species != 0 && Hub.Config.Discord.ReturnPKMs)
-            Trader.SendPKMAsync(result, "Here's what you traded me!").ConfigureAwait(false);
-
-        if (Hub.Config.Trade.TradeDisplay && info.Type is not PokeTradeType.Dump)
+        public DiscordTradeNotifier(T data, PokeTradeTrainerInfo info, int code, SocketUser trader)
         {
-            PKM emb = info.TradeData;
-            if (emb.Species == 0 || info.Type is PokeTradeType.Clone)
-                emb = result;
+            Data = data;
+            Info = info;
+            Code = code;
+            Trader = trader;
+        }
 
-            if (emb.Species != 0)
+        public void TradeInitialize(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info)
+        {
+            var tradeType = info.Type;
+            string tradeMessage;
+
+            if (tradeType != PokeTradeType.Mystery)
             {
-                var shiny = emb.ShinyXor == 0 ? "■" : emb.ShinyXor <= 16 ? "★" : "";
-                var set = new ShowdownSet($"{emb.Species}");
-                var ballImg = $"https://raw.githubusercontent.com/BakaKaito/HomeImages/main/Ballimg/50x50/" + $"{(Ball)emb.Ball}ball".ToLower() + ".png";
-                var gender = emb.Gender == 0 ? " - (M)" : emb.Gender == 1 ? " - (F)" : "";
-                var pokeImg = TradeExtensions<T>.PokeImg(emb, false, false);
-                string scale = "";
+                // Check if Data.Nickname is not null before including it in the message
+                var nicknameMessage = !string.IsNullOrEmpty(info.TradeData.Nickname) ? $" ({info.TradeData.Nickname})" : "";
+                var formattedCode = $"{info.Code:D8}";
+                formattedCode = formattedCode.Insert(4, " "); // Insert a space after the fourth character
+                tradeMessage = $"Initializing trade for **{nicknameMessage}**. Please be ready. Your code is **{formattedCode}**.";
+            }
+            else
+            {
+                tradeMessage = "Initializing trade.";
+            }
 
-                if (emb is PK9 fin9)
-                    scale = $"Scale: {PokeSizeDetailedUtil.GetSizeRating(fin9.Scale)} ({fin9.Scale})";
-                if (emb is PA8 fin8a)
-                    scale = $"Scale: {PokeSizeDetailedUtil.GetSizeRating(fin8a.Scale)} ({fin8a.Scale})";
-                if (emb is PB8 fin8b)
-                    scale = $"Scale: {PokeSizeDetailedUtil.GetSizeRating(fin8b.HeightScalar)} ({fin8b.HeightScalar})";
-                if (emb is PK8 fin8)
-                    scale = $"Scale: {PokeSizeDetailedUtil.GetSizeRating(fin8.HeightScalar)} ({fin8.HeightScalar})";
+            var embed = new EmbedBuilder
+            {
+                Title = "Trade Initialized",
+                Description = tradeMessage,
+                Color = GetDiscordColor(info.TradeData.IsShiny ? ShinyMap[((Species)info.TradeData.Species, info.TradeData.Form)] : (PersonalColor)info.TradeData.PersonalInfo.Color),
+            }
+            .WithCurrentTimestamp();
 
-                var trademessage = $"Pokémon IVs: {emb.IV_HP}/{emb.IV_ATK}/{emb.IV_DEF}/{emb.IV_SPA}/{emb.IV_SPD}/{emb.IV_SPE}\n" +
-                    $"Ability: {GameInfo.GetStrings(1).Ability[emb.Ability]}\n" +
-                    $"{(Nature)emb.Nature} Nature\n{scale}" +
-                    (TradeExtensions<T>.HasMark((IRibbonIndex)emb, out RibbonIndex mark) ? $"\nPokémon Mark: {mark.ToString().Replace("Mark", "")}{Environment.NewLine}" : "");
+            Trader.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
+        }
 
-                string markEntryText = "";
-                var index = (int)mark - (int)RibbonIndex.MarkLunchtime;
-                if (index > 0)
-                    markEntryText = TradeExtensions<T>.MarkTitle[index];
+        public void TradeSearching(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info)
+        {
+            var name = Info.TrainerName;
+            var trainer = string.IsNullOrEmpty(name) ? string.Empty : $", {name}";
+            var embed = new EmbedBuilder
+            {
+                Title = "Trade Searching",
+                Description = $"I'm waiting for you**{trainer}**! Your code is **{Code:0000 0000}**. My IGN is **{routine.InGameName}**.",
+                Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
+            }
+            .WithCurrentTimestamp();
 
-                var specitem = emb.HeldItem != 0 ? $"{SpeciesName.GetSpeciesNameGeneration(emb.Species, 2, emb.Generation <= 8 ? 8 : 9)}{TradeExtensions<T>.FormOutput(emb.Species, emb.Form, out _) + " (" + ShowdownParsing.GetShowdownText(emb).Split('@', '\n')[1].Trim() + ")"}" : $"{SpeciesName.GetSpeciesNameGeneration(emb.Species, 2, emb.Generation <= 8 ? 8 : 9) + TradeExtensions<T>.FormOutput(emb.Species, emb.Form, out _)}{markEntryText}";
+            Trader.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
+        }
 
-                var msg = "Displaying your ";
-                var mode = info.Type;
-                switch (mode)
+        public void TradeCanceled(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, PokeTradeResult msg)
+        {
+
+
+            OnFinish?.Invoke(routine);
+            var embed = new EmbedBuilder
+            {
+                Title = "Trade Canceled",
+                Description = $"Trade canceled: **{msg}**",
+                Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
+            }
+            .WithCurrentTimestamp();
+
+
+            Trader.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
+        }
+
+        public void TradeFinished(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, T result)
+        {
+            OnFinish?.Invoke(routine);
+            var tradedToUser = Data.Species;
+            var message = tradedToUser != 0
+            ? $"Trade finished. Enjoy your {(info.Type == PokeTradeType.Mystery ? "**Mystery Pokemon**" : $"**{(Species)tradedToUser}**")}!"
+    : "Trade finished!";
+            var tradeFinishedEmbed = new EmbedBuilder
+            {
+                Title = "Trade Finished",
+                Description = message,
+                Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
+            }
+            .WithCurrentTimestamp()
+            .Build();
+
+            Trader.SendMessageAsync(embed: tradeFinishedEmbed).ConfigureAwait(false);
+
+            if (result.Species != 0 && Hub.Config.Discord.ReturnPKMs)
+            {
+                var pkmMessage = "Here's What You Traded Me!";
+
+                var pkmEmbed = new EmbedBuilder
                 {
-                    case PokeTradeType.Specific: msg += "request!"; break;
-                    case PokeTradeType.Clone: msg += "clone!"; break;
+                    Description = pkmMessage,
+                    Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
                 }
-                string TIDFormatted = emb.Generation >= 7 ? $"{emb.TrainerTID7:000000}" : $"{emb.TID16:00000}";
-                var footer = new EmbedFooterBuilder { Text = $"Trainer Info: {emb.OT_Name}/{TIDFormatted}" };
-                var author = new EmbedAuthorBuilder
-                {
-                    Name = $"{Context.User.Username}'s Pokémon",
-                    IconUrl = ballImg
-                };
-                var embed = new EmbedBuilder { Color = emb.IsShiny && emb.ShinyXor == 0 ? Color.Gold : emb.IsShiny ? Color.LighterGrey : Color.Teal, Author = author, Footer = footer, ThumbnailUrl = pokeImg };
-                embed.AddField(x =>
-                {
-                    x.Name = $"{shiny} {specitem}{gender}";
-                    x.Value = trademessage;
-                    x.IsInline = false;
-                });
-                Context.Channel.SendMessageAsync(Trader.Username + " - " + msg, embed: embed.Build()).ConfigureAwait(false);
+                .WithCurrentTimestamp()
+                .Build();
+
+                Trader.SendMessageAsync(embed: pkmEmbed).ConfigureAwait(false);
+
+                Trader.SendPKMAsync(result).ConfigureAwait(false);
             }
         }
-    }
 
-    public void SendNotification(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, string message)
-    {
-        Trader.SendMessageAsync(message).ConfigureAwait(false);
-    }
-
-    public void SendNotification(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, PokeTradeSummary message)
-    {
-        if (message.ExtraInfo is SeedSearchResult r)
+        public void SendNotification(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, string message)
         {
-            SendNotificationZ3(r);
-            return;
+            var embed = new EmbedBuilder
+            {
+                Title = "Notification",
+                Description = message,
+                Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
+            };
+            embed.WithCurrentTimestamp();
+            Trader.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
         }
 
-        var msg = message.Summary;
-        if (message.Details.Count > 0)
-            msg += ", " + string.Join(", ", message.Details.Select(z => $"{z.Heading}: {z.Detail}"));
-        Trader.SendMessageAsync(msg).ConfigureAwait(false);
-    }
-
-    public void SendNotification(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, T result, string message)
-    {
-        if (result.Species != 0 && (Hub.Config.Discord.ReturnPKMs || info.Type == PokeTradeType.Dump))
-            Trader.SendPKMAsync(result, message).ConfigureAwait(false);
-    }
-
-    private void SendNotificationZ3(SeedSearchResult r)
-    {
-        var lines = r.ToString();
-
-        var embed = new EmbedBuilder { Color = Color.LighterGrey };
-        embed.AddField(x =>
+        public void SendNotification(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, PokeTradeSummary message)
         {
-            x.Name = $"Seed: {r.Seed:X16}";
-            x.Value = lines;
-            x.IsInline = false;
-        });
-        var msg = $"Here are the details for `{r.Seed:X16}`:";
-        Trader.SendMessageAsync(msg, embed: embed.Build()).ConfigureAwait(false);
+            if (message.ExtraInfo is SeedSearchResult r)
+            {
+                SendNotificationZ3(r);
+                return;
+            }
+
+            var msg = message.Summary;
+            if (message.Details.Count > 0)
+                msg += ", " + string.Join(", ", message.Details.Select(z => $"{z.Heading}: {z.Detail}"));
+            var embed = new EmbedBuilder
+            {
+                Title = "Notification",
+                Description = msg,
+                Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
+            };
+            embed.WithCurrentTimestamp();
+            Trader.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
+        }
+
+        public void SendNotification(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, T result, string message)
+        {
+            if (result.Species != 0 && (Hub.Config.Discord.ReturnPKMs || info.Type == PokeTradeType.Dump))
+                Trader.SendPKMAsync(result, message).ConfigureAwait(false);
+        }
+
+        private void SendNotificationZ3(SeedSearchResult r)
+        {
+            var lines = r.ToString();
+
+            var embed = new EmbedBuilder
+            {
+                Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
+            };
+            embed.AddField(x =>
+            {
+                x.Name = $"Seed: {r.Seed:X16}";
+                x.Value = lines;
+                x.IsInline = false;
+            });
+            var msg = $"Here are the details for `{r.Seed:X16}`:";
+            Trader.SendMessageAsync(msg, embed: embed.Build()).ConfigureAwait(false);
+        }
+
+        public void SendIncompleteEtumrepEmbed(PokeRoutineExecutor<T> routine, PokeTradeDetail<T> info, string msg, IReadOnlyList<PA8> pkms)
+        {
+            var list = new List<FileAttachment>();
+            for (int i = 0; i < pkms.Count; i++)
+            {
+                var pk = pkms[i];
+                var ms = new MemoryStream(pk.Data);
+                var name = Util.CleanFileName(pk.FileName);
+                list.Add(new(ms, name));
+            }
+
+            var embed = new EmbedBuilder
+            {
+                Color = GetDiscordColor(Data.IsShiny ? ShinyMap[((Species)Data.Species, Data.Form)] : (PersonalColor)Data.PersonalInfo.Color),
+                Description = "Here are all the Pokémon you dumped!"
+            }.WithAuthor(x => { x.Name = "Pokémon Legends: Arceus Dump"; });
+
+            var ch = Trader.CreateDMChannelAsync().Result;
+            ch.SendFilesAsync(list, msg, false, embed: embed.Build()).ConfigureAwait(false);
+        }
     }
 }

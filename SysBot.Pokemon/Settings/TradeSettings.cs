@@ -38,6 +38,12 @@ public class TradeSettings : IBotStateSettings, ICountSettings
     [Category(TradeConfig), Description("When enabled, the screen will be turned off during normal bot loop operation to save power.")]
     public bool ScreenOff { get; set; }
 
+    [Category(TradeConfig), Description("Silly, useless feature to post a meme when certain illegal or disallowed trade requests are made.")]
+    public bool Memes { get; set; } = false;
+
+    [Category(TradeConfig), Description("Sends Embeds with requested Pokemon trades.")]
+    public bool UseTradeEmbeds { get; set; } = false;
+
     [Category(TradeConfig), Description("Use Trade Partner details (OT, TID, SID, Gender), when legally possible.")]
     public bool UseTradePartnerDetails { get; set; } = false;
 
