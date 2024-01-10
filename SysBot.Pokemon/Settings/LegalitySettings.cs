@@ -1,4 +1,4 @@
-﻿using PKHeX.Core;
+using PKHeX.Core;
 using System.Collections.Generic;
 using System.ComponentModel;
 
@@ -61,6 +61,9 @@ public class LegalitySettings
 
     [Category(Generate), Description("Requires HOME tracker when trading Pokémon that had to have traveled between the Switch games.")]
     public bool EnableHOMETrackerCheck { get; set; }
+
+    [Category(Generate), Description("Allows generating transfer-only Pokémon. They will not have a HOME tracker and will not be able to enter HOME.")]
+    public bool AllowHOMETransferGeneration { get; set; } = true;
 
     [Category(Generate), Description("The order in which Pokémon encounter types are attempted.")]
     public List<EncounterTypeGroup> PrioritizeEncounters { get; set; } =
