@@ -1,8 +1,7 @@
-﻿using PKHeX.Core;
+using PKHeX.Core;
 using SysBot.Pokemon.Discord;
 using SysBot.Pokemon.Twitch;
 using SysBot.Pokemon.WinForms;
-using SysBot.Pokemon.YouTube;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,14 +16,12 @@ public class PokeBotRunnerImpl<T> : PokeBotRunner<T> where T : PKM, new()
     public PokeBotRunnerImpl(PokeTradeHubConfig config, BotFactory<T> fac) : base(config, fac) { }
 
     private TwitchBot<T>? Twitch;
-    private YouTubeBot<T>? YouTube;
-
+  
     protected override void AddIntegrations()
     {
         AddDiscordBot(Hub.Config.Discord.Token);
         AddTwitchBot(Hub.Config.Twitch);
-        AddYouTubeBot(Hub.Config.YouTube);
-    }
+     }
 
     private void AddTwitchBot(TwitchSettings config)
     {
@@ -44,7 +41,7 @@ public class PokeBotRunnerImpl<T> : PokeBotRunner<T> where T : PKM, new()
         if (Hub.Config.Twitch.DistributionCountDown)
             Hub.BotSync.BarrierReleasingActions.Add(() => Twitch.StartingDistribution(config.MessageStart));
     }
-    private void AddDiscordBot(string apiToken)
+      private void AddDiscordBot(string apiToken)
     {
         if (string.IsNullOrWhiteSpace(apiToken))
             return;
