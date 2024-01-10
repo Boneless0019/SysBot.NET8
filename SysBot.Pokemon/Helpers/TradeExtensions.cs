@@ -4,9 +4,11 @@ using System.Diagnostics.Metrics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using PKHeX.Core;
 using PKHeX.Core.AutoMod;
 using SysBot.Base;
@@ -282,61 +284,134 @@ public class TradeExtensions<T> where T : PKM, new()
         return pkm;
     }
 
-    public static string PokeImg(PKM pkm, bool canGmax, bool fullSize)
+    /// <summary>
+    /// Asynchronously fetches the image URL for a given item name from specified sources.
+    /// If the item image is not found, returns a default 'no image' URL.
+    /// </summary>
+    /// <param name="itemName">The name of the item to fetch the image for.</param>
+    /// <returns>The URL of the item image or a default image URL if not found.</returns>
+    public static async Task<string> ItemImg(string itemName)
     {
-        bool md = false;
-        bool fd = false;
-        string[] baseLink;
-        if (fullSize)
-            baseLink = "https://raw.githubusercontent.com/zyro670/HomeImages/master/512x512/poke_capture_0001_000_mf_n_00000000_f_n.png".Split('_');
-        else baseLink = "https://raw.githubusercontent.com/zyro670/HomeImages/master/128x128/poke_capture_0001_000_mf_n_00000000_f_n.png".Split('_');
+        // Sanitize the item name to remove any non-word characters and convert to lower case.
+        string sanitizedItemName = Regex.Replace(itemName, @"[^\w\.\-]+", "").ToLower();
 
-        if (Enum.IsDefined(typeof(GenderDependent), pkm.Species) && !canGmax && pkm.Form is 0)
+        // Define a list of URL patterns where the item images can be found.
+        var urlPatterns = new List<string>
+    {
+        "https://www.serebii.net/itemdex/sprites/pgl/{0}.png",
+        "https://www.serebii.net/itemdex/sprites/sv/{0}.png",
+        "https://www.serebii.net/itemdex/sprites/legends/{0}.png",
+        "https://www.serebii.net/itemdex/sprites/{0}.png",
+    };
+
+        // Check each URL pattern to find a valid image URL.
+        foreach (var pattern in urlPatterns)
         {
-            if (pkm.Gender == 0 && pkm.Species != (int)Species.Torchic)
-                md = true;
-            else fd = true;
+            string testUrl = string.Format(pattern, sanitizedItemName);
+            if (await IsUrlValid(testUrl))
+            {
+                return testUrl;
+            }
         }
 
-        int form = pkm.Species switch
+        // Return a default image URL if no valid image URL is found.
+        return "https://sysbots.net/wp-content/uploads/2023/12/No-image-found.jpg";
+    }
+
+    private static async Task<bool> IsUrlValid(string url)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Head, url);
+            var response = await StaticHttpClient.Client.SendAsync(request);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogText($"Exception occurred while checking URL: {url} - {ex.Message}");
+            return false;
+        }
+    }
+
+    public static class StaticHttpClient
+    {
+        public static readonly HttpClient Client = new();
+    }
+
+
+
+    private static async Task<bool> IsUrlValid(HttpClient client, string url)
+    {
+        try
+        {
+            var request = new HttpRequestMessage(HttpMethod.Head, url);
+            var response = await client.SendAsync(request);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            LogUtil.LogText($"Exception occurred while checking URL: {url} - {ex.Message}");
+            return false;
+        }
+    }
+
+    public static string PokeImg(PKM pkm, bool canGmax, bool fullSize)
+    {
+        // Base URL setup
+        string baseUrl = fullSize
+            ? "https://raw.githubusercontent.com/Poke-Legend/HomeImages/master/128x128/poke_capture_"
+            : "https://raw.githubusercontent.com/Poke-Legend/HomeImages/master/128x128/poke_capture_";
+
+        // Format species and form
+        string speciesFormatted = pkm.Species.ToString("D4");
+        int form = DetermineForm(pkm, canGmax);
+        string formFormatted = form.ToString("D3");
+
+        // Determine gender code
+        string genderCode = DetermineGenderCode(pkm);
+
+        // Special handling for Sneasel and Basculegion
+        HandleSpecialSpecies(pkm, ref genderCode, ref form);
+
+        // Construct the image URL
+        string shinyCode = pkm.IsShiny ? "r" : "n";
+        string gmaxCode = canGmax ? "g" : "n";
+        string alcremieSuffix = pkm.Species == (int)Species.Alcremie && !canGmax ? $"0000000{pkm.Data[0xD0]}" : "00000000";
+
+        return $"{baseUrl}{speciesFormatted}_{formFormatted}_{genderCode}_{gmaxCode}_{alcremieSuffix}_f_{shinyCode}.png";
+    }
+
+    private static string DetermineGenderCode(PKM pkm)
+    {
+        if (Enum.IsDefined(typeof(GenderDependent), pkm.Species) && pkm.Form == 0)
+            return pkm.Gender == 0 ? "md" : "fd";
+
+        return pkm.PersonalInfo switch
+        {
+            { OnlyFemale: true } => "fo",
+            { OnlyMale: true } => "mo",
+            { Genderless: true } => "uk",
+            _ => "mf"
+        };
+    }
+
+    private static int DetermineForm(PKM pkm, bool canGmax)
+    {
+        return pkm.Species switch
         {
             (int)Species.Sinistea or (int)Species.Polteageist or (int)Species.Rockruff or (int)Species.Mothim => 0,
             (int)Species.Alcremie when pkm.IsShiny || canGmax => 0,
             _ => pkm.Form,
-
         };
+    }
 
-        if (pkm.Species is (ushort)Species.Sneasel)
+    private static void HandleSpecialSpecies(PKM pkm, ref string genderCode, ref int form)
+    {
+        if (pkm.Species == (ushort)Species.Sneasel || pkm.Species == (ushort)Species.Basculegion)
         {
-            if (pkm.Gender is 0)
-                md = true;
-            else fd = true;
+            genderCode = pkm.Gender == 0 ? "md" : "fd";
+            form = pkm.Species == (ushort)Species.Basculegion ? pkm.Gender : form;
         }
-
-        if (pkm.Species is (ushort)Species.Basculegion)
-        {
-            if (pkm.Gender is 0)
-            {
-                md = true;
-                pkm.Form = 0;
-            }
-            else
-            {
-                pkm.Form = 1;
-            }
-
-            string s = pkm.IsShiny ? "r" : "n";
-            string g = md && pkm.Gender is not 1 ? "md" : "fd";
-            return $"https://raw.githubusercontent.com/zyro670/HomeImages/master/128x128/poke_capture_0" + $"{pkm.Species}" + "_00" + $"{pkm.Form}" + "_" + $"{g}" + "_n_00000000_f_" + $"{s}" + ".png";
-        }
-
-        baseLink[2] = pkm.Species < 10 ? $"000{pkm.Species}" : pkm.Species < 100 && pkm.Species > 9 ? $"00{pkm.Species}" : pkm.Species >= 1000 ? $"{pkm.Species}" : $"0{pkm.Species}";
-        baseLink[3] = pkm.Form < 10 ? $"00{form}" : $"0{form}";
-        baseLink[4] = pkm.PersonalInfo.OnlyFemale ? "fo" : pkm.PersonalInfo.OnlyMale ? "mo" : pkm.PersonalInfo.Genderless ? "uk" : fd ? "fd" : md ? "md" : "mf";
-        baseLink[5] = canGmax ? "g" : "n";
-        baseLink[6] = "0000000" + (pkm.Species == (int)Species.Alcremie && !canGmax ? pkm.Data[0xD0] : 0);
-        baseLink[8] = pkm.IsShiny ? "r.png" : "n.png";
-        return string.Join("_", baseLink);
     }
 
     public static string FormOutput(ushort species, byte form, out string[] formString)
