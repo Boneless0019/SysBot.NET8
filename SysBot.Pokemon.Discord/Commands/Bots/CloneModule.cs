@@ -19,6 +19,7 @@ namespace SysBot.Pokemon.Discord
 
             var iconURL = Context.User.GetAvatarUrl();
             var cloneMessage = $" You have been added to the Pokémon **Clone** queue. \n Check your DM's for further instructions.";
+            Aesthetics.PersonalColor.White personalColorDiscord = personalColor;
             var embedCloneMessage = new EmbedBuilder()
             {
 
