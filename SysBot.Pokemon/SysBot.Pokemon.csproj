@@ -7,6 +7,10 @@
   <ItemGroup>
     <Folder Include="deps\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NLog" Version="5.2.8" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="PKHeX.Core.AutoMod">
       <HintPath>deps\PKHeX.Core.AutoMod.dll</HintPath>
