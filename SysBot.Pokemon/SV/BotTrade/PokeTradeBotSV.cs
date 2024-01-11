@@ -256,17 +256,6 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
             return PokeTradeResult.RecoverStart;
         }
 
-        //If we reach there, we should be correctly connected. Bot will crash if not. Extra connection online check just to be sure.
-        if (!await IsConnectedOnline(ConnectedOffset, token).ConfigureAwait(false))
-        {
-            Log("Disconnection detected. Trying to reinitialize...");
-            await RecoverToOverworld(token).ConfigureAwait(false);
-            await ConnectAndEnterPortal(token).ConfigureAwait(false);
-            await RecoverToOverworld(token).ConfigureAwait(false);
-            StartFromOverworld = true;
-            return PokeTradeResult.RecoverStart;
-        }
-
         var toSend = poke.TradeData;
         if (toSend.Species != 0)
             await SetBoxPokemonAbsolute(BoxStartOffset, toSend, token, sav).ConfigureAwait(false);
@@ -351,7 +340,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
 
         var tradePartner = await GetTradePartnerInfo(token).ConfigureAwait(false);
         var trainerNID = await GetTradePartnerNID(TradePartnerNIDOffset, token).ConfigureAwait(false);
-        RecordUtil<PokeTradeBotSV>.Record($"Initiating\t{trainerNID:X16}\t{tradePartner.TrainerName}\t{poke.Trainer.TrainerName}\t{poke.Trainer.ID}\t{poke.ID}\t{toSend.EncryptionConstant:X8}");
+        RecordUtil<PokeTradeBotSWSH>.Record($"Initiating\t{trainerNID:X16}\t{tradePartner.TrainerName}\t{poke.Trainer.TrainerName}\t{poke.Trainer.ID}\t{poke.ID}\t{toSend.EncryptionConstant:X8}");
         Log($"Found Link Trade partner: {tradePartner.TrainerName}-{tradePartner.TID7} (ID: {trainerNID})");
 
         var partnerCheck = await CheckPartnerReputation(this, poke, trainerNID, tradePartner.TrainerName, AbuseSettings, token);
@@ -362,7 +351,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
             return partnerCheck;
         }
 
-        if (Hub.Config.Trade.UseTradePartnerDetails && TradeExtensions<PK9>.CanUsePartnerDetails(this, toSend, sav, tradePartner.MyInfo, poke, Hub.Config, out var toSendEdited))
+        if (Hub.Config.Trade.UseTradePartnerDetails && TradeExtensions<PK9>.CanUsePartnerDetails(this, toSend, sav, tradePartner.Info, poke, Hub.Config, out var toSendEdited))
         {
             toSend = toSendEdited;
             await SetBoxPokemonAbsolute(BoxStartOffset, toSend, token, sav).ConfigureAwait(false);

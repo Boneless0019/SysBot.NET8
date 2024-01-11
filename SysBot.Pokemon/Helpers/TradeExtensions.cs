@@ -33,7 +33,7 @@ public class TradeExtensions<T> where T : PKM, new()
 
         res = (T)pk.Clone();
 
-        //Invalid trade request. Ditto is often requested for Masuda method, better to not apply partner details.
+       /* //Invalid trade request. Ditto is often requested for Masuda method, better to not apply partner details.
         if ((Species)pk.Species is Species.None or Species.Ditto || trade.Type is not PokeTradeType.Specific)
         {
             Log("Can not apply Partner details: Not a specific trade request.");
@@ -52,7 +52,7 @@ public class TradeExtensions<T> where T : PKM, new()
         {
             Log("Can not apply Partner details: Requested Pokémon already has set Trainer details.");
             return false;
-        }
+        } */
 
         res.OT_Name = partner.OT;
         res.OT_Gender = partner.Gender;
