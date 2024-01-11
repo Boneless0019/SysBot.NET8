@@ -64,7 +64,6 @@ public class TradeExtensions<T> where T : PKM, new()
                 if (!config.Legality.ForceTradePartnerInfo)
                 {
                     Log("Can not apply Partner details:");
-                    Log(la.Report());
                     return false;
                 }
 
@@ -78,7 +77,6 @@ public class TradeExtensions<T> where T : PKM, new()
                 if (!la.Valid)
                 {
                     Log("Can not apply Partner details:");
-                    Log(la.Report());
                     return false;
                 }
             }

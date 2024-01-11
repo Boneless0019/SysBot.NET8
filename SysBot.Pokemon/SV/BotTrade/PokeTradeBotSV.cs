@@ -173,7 +173,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
             await ConnectAndEnterPortal(token).ConfigureAwait(false);
         }
 
-        await Task.Delay(1_000, token).ConfigureAwait(false);
+        await Task.Delay(1_000, token);
     }
 
     protected virtual (PokeTradeDetail<PK9>? detail, uint priority) GetTradeData(PokeRoutineType type)
