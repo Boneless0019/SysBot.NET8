@@ -167,7 +167,6 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
             Log("Nothing to check, waiting for new users...");
         }
 
-        // More often than needed the console gets disconnected while waiting in the Poképortal
         while (!await IsConnectedOnline(ConnectedOffset, token).ConfigureAwait(false))
         {
             await RecoverToOverworld(token).ConfigureAwait(false);
