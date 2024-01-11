@@ -181,12 +181,7 @@ public class TradeExtensions<T> where T : PKM, new()
         pk.StatNature = pk.Nature;
         pk.SetEVs(new int[] { 0, 0, 0, 0, 0, 0 });
 
-        pk.SetMarkings();
-        pk.SetMarkings();
-        pk.SetMarkings();
-        pk.SetMarkings();
-        pk.SetMarkings();
-        pk.SetMarkings();
+        MarkingApplicator.SetMarkings(pk);
 
         pk.ClearRelearnMoves();
 
