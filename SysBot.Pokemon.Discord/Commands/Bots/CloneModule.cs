@@ -1,7 +1,12 @@
 using Discord;
 using Discord.Commands;
 using PKHeX.Core;
+using System.ComponentModel;
+using System.Net.NetworkInformation;
+using System;
 using System.Threading.Tasks;
+using static PKHeX.Core.AutoMod.Aesthetics;
+using static PKHeX.Core.AutoMod.Aesthetics.PersonalColor;
 
 namespace SysBot.Pokemon.Discord
 {
@@ -17,6 +22,7 @@ namespace SysBot.Pokemon.Discord
         public async Task CloneAsync(int code)
         {
 
+
             var iconURL = Context.User.GetAvatarUrl();
             var cloneMessage = $" You have been added to the Pokémon **Clone** queue. \n Check your DM's for further instructions.";
             var embedCloneMessage = new EmbedBuilder()
@@ -27,8 +33,8 @@ namespace SysBot.Pokemon.Discord
                     Name = Context.User.Username,
                     IconUrl = iconURL
                 },
-                Color = Color.Blue
-            }
+                Color = new Color(0xFFFFFF)
+        }
             .WithDescription(cloneMessage)
             .WithImageUrl("https://sysbots.net/wp-content/uploads/2023/12/render10square-removebg-preview.png")
             .WithThumbnailUrl("https://sysbots.net/wp-content/uploads/2023/08/logosysflyout.png")

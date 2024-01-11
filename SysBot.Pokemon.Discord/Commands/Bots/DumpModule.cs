@@ -26,7 +26,7 @@ namespace SysBot.Pokemon.Discord
                     Name = Context.User.Username,
                     IconUrl = iconURL
                 },
-                Color = Color.Blue
+                Color = new Color(0xFFFFFF)
             }
 
             .WithDescription(dumpMessage)
