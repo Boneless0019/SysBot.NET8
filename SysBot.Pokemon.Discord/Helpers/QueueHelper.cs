@@ -33,6 +33,7 @@ namespace SysBot.Pokemon.Discord
         public static MoveType TeraTypeOriginal { get; set; } // You can change the type to byte or int if required.
         public static MoveType TeraTypeOverride { get; set; }
         public static MoveType TeraType => TeraTypeUtil.GetTeraType((byte)TeraTypeOriginal, (byte)TeraTypeOverride);
+
         public static async Task AddToQueueAsync(SocketCommandContext context, int code, string trainer, RequestSignificance sig, T trade, PokeRoutineType routine, PokeTradeType type, SocketUser trader, int catchID = 0)
         {
             if ((uint)code > MaxTradeCode)
@@ -103,7 +104,6 @@ namespace SysBot.Pokemon.Discord
 
         private static bool AddToTradeQueue(SocketCommandContext context, T pk, int code, string trainerName, RequestSignificance sig, PokeRoutineType type, PokeTradeType t, SocketUser trader, out string msg, int catchID = 0)
         {
-
             var userID = trader.Id;
             var name = trader.Username;
 
@@ -116,11 +116,11 @@ namespace SysBot.Pokemon.Discord
             var Info = hub.Queues.Info;
             var inqueuemsg = "Sorry, you are already in the queue.";
 
-            Added = Info.AddToTradeQueue(trade, userID, sig == RequestSignificance.Owner);
+            var Added = Info.AddToTradeQueue(trade, userID, sig == RequestSignificance.Owner);
 
             if (Added == QueueResultAdd.AlreadyInQueue && !mgr.CanUseSudo(trader.Id))
             {
-                EmbedBuilder embed = new()
+                EmbedBuilder embed = new EmbedBuilder
                 {
                     Description = inqueuemsg,
                     Color = GetDiscordColor(pk.IsShiny ? ShinyMap[((Species)pk.Species, pk.Form)] : (PersonalColor)pk.PersonalInfo.Color)
@@ -134,25 +134,21 @@ namespace SysBot.Pokemon.Discord
 
             var position = Info.CheckPosition(userID, type);
 
-            var ticketID = "";
-            if (TradeStartModule<T>.IsStartChannel(context.Channel.Id))
-                ticketID = $", unique ID: {detail.ID}";
+            msg = TradeStartModule<T>.IsStartChannel(context.Channel.Id) ? "Trade Code sent to DM. \n" : "";
 
-            var pokeName = "";
-            if ((t == PokeTradeType.Specific) && pk.Species != 0)
-                pokeName = $"{(hub.Config.Trade.UseTradeEmbeds ? "" : pk.Species != (int)Species.Ditto && pk.HeldItem != 0 ? $" Receiving: {(Species)pk.Species} ({ShowdownParsing.GetShowdownText(pk).Split('@', '\n')[1].Trim()})" : $" Receiving: {(Species)pk.Species}. ")}";
-                msg = $" Trade Code sent to DM. \n ";
-            Queuepos = $" You are in queue #{position.Position} \n{msg}";
-
+            var Queuepos = $"You are in queue #{position.Position} \n{msg}";
             var botct = Info.Hub.Bots.Count;
+
             if (position.Position > botct)
             {
                 var eta = Info.Hub.Config.Queues.EstimateDelay(position.Position, botct);
-                ETA = $"Estimated Wait: {eta:F1} minutes. \n";
+                var ETA = $"Estimated Wait: {eta:F1} minutes. \n";
                 msg += ETA;
             }
+
             return true;
         }
+
 
         public static async Task AddToMysteryEggQueueAsync(SocketCommandContext context, int code, string trainer, RequestSignificance sig, T trade, PokeRoutineType routine, PokeTradeType type, SocketUser trader, int catchID = 0)
         {
@@ -297,15 +293,14 @@ namespace SysBot.Pokemon.Discord
                 }
             }
 
-            var teraType = Tera9RNG.GetTeraType(Tera9RNG.GetOriginalSeed(pk), GemType.Default, (ushort)pk.Species, pk.Form);
+            var teraType = Tera9RNG.GetTeraType(seed: Tera9RNG.GetOriginalSeed(pk), GemType.Random, (ushort)pk.Species, pk.Form);
+           
 
             // Add '**' before and after genderText to make it bold
             var genderText = pk.Gender == 0 ? " (M)" : pk.Gender == 1 ? " (F)" : "";
 
             // Create a variable for the name section
             string nameText = $"{(pk.IsShiny ? "✨ " : "")}{(Species)pk.Species}{genderText}\n";
-            string nameText2 = $"Terastalize";
-            string nameText3 = $"Nature";
             string formText = $"{(!string.IsNullOrEmpty(form) ? $" **Form**: {form}" : "")}\n";
             // Create variables for the other sections
             string heldItemText = pk.HeldItem != 0 ? $"**Held Item**: {itemName}\n" : "";
@@ -335,9 +330,8 @@ namespace SysBot.Pokemon.Discord
             string evText = evStats.Count > 0 ? $"**EVs**: {string.Join(" / ", evStats)}\n" : "";
 
             string abilityText = $"**Ability**: {(Ability)pk.Ability}\n";
-            string teraTypeText = $"**Type**: {(MoveType)teraType}\n";
+            string teraTypeText = $"**Tera Type**: {(MoveType)teraType}\n";
             string levelText = pk.CurrentLevel != 1 ? $"**Level**: {pk.CurrentLevel}\n" : "";
-            string languageText = $"**Language**: {(LanguageID)pk.Language}\n";
 
             string natureText = $"**{(Nature)pk.Nature}** **Nature** \n";
             string movesHeaderText = "**Moves**:\n";
@@ -390,29 +384,14 @@ namespace SysBot.Pokemon.Discord
             Embed.Fields.Add(new EmbedFieldBuilder
             {
                 Name = $"{nameText}",
-                Value = $"{formText}{heldItemText}{ivText}{evText}{languageText}{abilityText}{levelText}",
-                IsInline = false,
-
-            });
-            Embed.Fields.Add(new EmbedFieldBuilder
-            {
-                Name = $"{nameText2}",
-                Value = $"{teraTypeText}", // Ensure teraTypeText is set appropriately
-                IsInline = false,
-            });
-            Embed.Fields.Add(new EmbedFieldBuilder
-            {
-                Name = $"{nameText3}",
-                Value = $"{natureText}",
-                IsInline = false,
-
-            });
+                Value = $"{formText}{heldItemText}{ivText}{evText}{abilityText}{teraTypeText}{levelText}{natureText}",
+                IsInline = false
+            }) ;
             Embed.Fields.Add(new EmbedFieldBuilder
             {
                 Name = movesHeaderText,
                 Value = movesText,
-                IsInline = false,
-
+                IsInline = false
             });
 
 
