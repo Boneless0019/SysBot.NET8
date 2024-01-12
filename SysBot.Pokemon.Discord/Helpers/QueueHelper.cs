@@ -123,7 +123,6 @@ namespace SysBot.Pokemon.Discord
                 EmbedBuilder embed = new()
                 {
                     Description = inqueuemsg,
-
                     Color = GetDiscordColor(pk.IsShiny ? ShinyMap[((Species)pk.Species, pk.Form)] : (PersonalColor)pk.PersonalInfo.Color)
                 };
 
