@@ -324,7 +324,6 @@ namespace SysBot.Pokemon.Discord
 
             string abilityText = $"**Ability**: {(Ability)pk.Ability}\n";
             string levelText = pk.CurrentLevel != 1 ? $"**Level**: {pk.CurrentLevel}\n" : "";
-
             string natureText = $"**{(Nature)pk.Nature}** **Nature** \n";
             string movesHeaderText = "**Moves**:\n";
             string movesText = movesList;
