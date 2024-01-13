@@ -1,4 +1,4 @@
-﻿using Discord;
+using Discord;
 using Discord.Commands;
 using System;
 using System.Linq;
@@ -22,45 +22,6 @@ namespace SysBot.Pokemon.Discord
             public EmbedBuilder Embed { get; set; } = new();
             public ulong MessageID { get; set; }
             public DateTime EntryTime { get; set; }
-        }
-
-        public async Task ListUtil(SocketCommandContext ctx, string nameMsg, string entry)
-        {
-            List<string> pageContent = ListUtilPrep(entry);
-            bool canReact = ctx.Guild.CurrentUser.GetPermissions(ctx.Channel as IGuildChannel).AddReactions;
-            var embed = new EmbedBuilder { Color = GetBorderColor(false) }.AddField(x =>
-            {
-                x.Name = nameMsg;
-                x.Value = pageContent[0];
-                x.IsInline = false;
-            }).WithFooter(x =>
-            {
-                x.IconUrl = "https://i.imgur.com/nXNBrlr.png";
-                x.Text = $"Page 1 of {pageContent.Count}";
-            });
-
-            if (!canReact && pageContent.Count > 1)
-            {
-                embed.AddField(x =>
-                {
-                    x.Name = "Missing \"Add Reactions\" Permission";
-                    x.Value = "Displaying only the first page of the list due to embed field limits.";
-                });
-            }
-
-            var msg = await ctx.Message.Channel.SendMessageAsync(embed: embed.Build()).ConfigureAwait(false);
-            if (pageContent.Count > 1 && canReact)
-            {
-                bool exists = ReactMessageDict.TryGetValue(ctx.User.Id, out _);
-                if (exists)
-                    ReactMessageDict[ctx.User.Id] = new() { Embed = embed, Pages = pageContent, MessageID = msg.Id, EntryTime = DateTime.Now };
-                else ReactMessageDict.Add(ctx.User.Id, new() { Embed = embed, Pages = pageContent, MessageID = msg.Id, EntryTime = DateTime.Now });
-
-                IEmote[] reactions = { new Emoji("⬅️"), new Emoji("➡️"), new Emoji("⬆️"), new Emoji("⬇️") };
-                _ = Task.Run(async () => await msg.AddReactionsAsync(reactions).ConfigureAwait(false));
-                if (!DictWipeRunning)
-                    _ = Task.Run(DictWipeMonitor);
-            }
         }
 
         private static async Task DictWipeMonitor()
@@ -149,27 +110,6 @@ namespace SysBot.Pokemon.Discord
             }
             return list;
         }
-
-        private static List<string> ListUtilPrep(string entry)
-        {
-            List<string> pageContent = new();
-            if (entry.Length > 1024)
-            {
-                var index = 0;
-                while (true)
-                {
-                    var splice = SpliceAtWord(entry, index, 1024);
-                    if (splice.Count == 0)
-                        break;
-
-                    index += splice.Count;
-                    pageContent.Add(string.Join(entry.Contains(',') ? ", " : entry.Contains('|') ? " | " : "\n", splice));
-                }
-            }
-            else pageContent.Add(entry == "" ? "No results found." : entry);
-            return pageContent;
-        }
-
         public Color GetBorderColor(bool gift, PKM? pkm = null)
         {
             bool swsh = typeof(T) == typeof(PK8);
