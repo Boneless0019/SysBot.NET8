@@ -26,13 +26,9 @@ namespace SysBot.Pokemon.Discord
 
         private static EmbedBuilder Embed { get; set; } = new();
 
-        private static string? ETA;
-        private static string? Queuepos;
-        private static QueueResultAdd? Added;
-
-        public static MoveType TeraTypeOriginal { get; set; } // You can change the type to byte or int if required.
-        public static MoveType TeraTypeOverride { get; set; }
-        public static MoveType TeraType => TeraTypeUtil.GetTeraType((byte)TeraTypeOriginal, (byte)TeraTypeOverride);
+        private static readonly string? ETA;
+        private static readonly string? Queuepos;
+        private static readonly QueueResultAdd? Added;
 
         public static async Task AddToQueueAsync(SocketCommandContext context, int code, string trainer, RequestSignificance sig, T trade, PokeRoutineType routine, PokeTradeType type, SocketUser trader, int catchID = 0)
         {
@@ -293,9 +289,6 @@ namespace SysBot.Pokemon.Discord
                 }
             }
 
-            var teraType = Tera9RNG.GetTeraType(seed: Tera9RNG.GetOriginalSeed(pk), GemType.Random, (ushort)pk.Species, pk.Form);
-           
-
             // Add '**' before and after genderText to make it bold
             var genderText = pk.Gender == 0 ? " (M)" : pk.Gender == 1 ? " (F)" : "";
 
@@ -330,7 +323,6 @@ namespace SysBot.Pokemon.Discord
             string evText = evStats.Count > 0 ? $"**EVs**: {string.Join(" / ", evStats)}\n" : "";
 
             string abilityText = $"**Ability**: {(Ability)pk.Ability}\n";
-            string teraTypeText = $"**Tera Type**: {(MoveType)teraType}\n";
             string levelText = pk.CurrentLevel != 1 ? $"**Level**: {pk.CurrentLevel}\n" : "";
 
             string natureText = $"**{(Nature)pk.Nature}** **Nature** \n";
@@ -384,7 +376,7 @@ namespace SysBot.Pokemon.Discord
             Embed.Fields.Add(new EmbedFieldBuilder
             {
                 Name = $"{nameText}",
-                Value = $"{formText}{heldItemText}{ivText}{evText}{abilityText}{teraTypeText}{levelText}{natureText}",
+                Value = $"{formText}{heldItemText}{ivText}{evText}{abilityText}{levelText}{natureText}",
                 IsInline = false
             }) ;
             Embed.Fields.Add(new EmbedFieldBuilder

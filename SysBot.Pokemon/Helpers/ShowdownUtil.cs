@@ -1,4 +1,5 @@
 using PKHeX.Core;
+using System;
 
 namespace SysBot.Pokemon;
 
@@ -11,6 +12,7 @@ public static class ShowdownUtil
     /// <returns>ShowdownSet object</returns>
     public static ShowdownSet? ConvertToShowdown(string setstring)
     {
+        if (setstring is null) throw new ArgumentNullException(nameof(setstring));
         // LiveStreams remove new lines, so we are left with a single line set
         var restorenick = string.Empty;
 
