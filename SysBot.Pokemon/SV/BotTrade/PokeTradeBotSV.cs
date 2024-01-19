@@ -270,6 +270,7 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
         if (poke.Code < 0)
         {
             Log("Selecting Link Trade code.");
+            await Click(X, 1_000, token).ConfigureAwait(false);
             await Click(A, 0_500, token).ConfigureAwait(false);
         }
         else if (poke.Type != PokeTradeType.Random || !LastTradeDistributionFixed)
