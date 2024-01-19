@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using static SysBot.Base.SwitchButton;
 using static SysBot.Pokemon.PokeDataOffsetsSV;
 using System.IO;
+using System.ComponentModel.Design;
 
 namespace SysBot.Pokemon;
 
@@ -264,7 +265,14 @@ public class PokeTradeBotSV(PokeTradeHub<PK9> Hub, PokeBotState Config) : PokeRo
 
         await Click(A, 1_500, token).ConfigureAwait(false);
         // Make sure we clear any Link Codes if we're not in Distribution with fixed code, and it wasn't entered last round.
-        if (poke.Type != PokeTradeType.Random || !LastTradeDistributionFixed)
+
+
+        if (poke.Code < 0)
+        {
+            Log("Selecting Link Trade code.");
+            await Click(A, 0_500, token).ConfigureAwait(false);
+        }
+        else if (poke.Type != PokeTradeType.Random || !LastTradeDistributionFixed)
         {
             await Click(X, 1_000, token).ConfigureAwait(false);
             await Click(PLUS, 1_000, token).ConfigureAwait(false);
