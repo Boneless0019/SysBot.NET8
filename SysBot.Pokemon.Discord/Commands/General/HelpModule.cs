@@ -1,116 +1,129 @@
-﻿using Discord;
+using Discord;
 using Discord.Commands;
+using Discord.WebSocket;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace SysBot.Pokemon.Discord;
-
-public class HelpModule(CommandService Service) : ModuleBase<SocketCommandContext>
+namespace SysBot.Pokemon.Discord
 {
-    [Command("help")]
-    [Summary("Lists available commands.")]
-    public async Task HelpAsync()
+    public class HelpModule : ModuleBase<SocketCommandContext>
     {
-        var builder = new EmbedBuilder
-        {
-            Color = new Color(114, 137, 218),
-            Description = "These are the commands you can use:",
-        };
+        private readonly CommandService _service;
+        private IUserMessage _helpMessage;
+        private int _currentPage = 1;
+        private readonly List<IEmote> _pageEmojis = new List<IEmote>() { new Emoji("⬅️"), new Emoji("➡️") }; // Left and Right Arrow Emojis
 
-        var mgr = SysCordSettings.Manager;
-        var app = await Context.Client.GetApplicationInfoAsync().ConfigureAwait(false);
-        var owner = app.Owner.Id;
-        var uid = Context.User.Id;
-
-        foreach (var module in Service.Modules)
+        public HelpModule(CommandService service)
         {
-            string? description = null;
-            HashSet<string> mentioned = [];
-            foreach (var cmd in module.Commands)
+            _service = service;
+        }
+
+        [Command("help")]
+        [Summary("Lists available commands.")]
+        public async Task HelpAsync()
+        {
+            await ShowHelpPage(_currentPage);
+        }
+
+        private async Task ShowHelpPage(int pageNumber)
+        {
+            var builder = new EmbedBuilder
             {
-                var name = cmd.Name;
-                if (mentioned.Contains(name))
-                    continue;
-                if (cmd.Attributes.Any(z => z is RequireOwnerAttribute) && owner != uid)
-                    continue;
-                if (cmd.Attributes.Any(z => z is RequireSudoAttribute) && !mgr.CanUseSudo(uid))
-                    continue;
+                Color = new Color(114, 137, 218),
+                Title = "Help Page",
+            };
 
-                mentioned.Add(name);
-                var result = await cmd.CheckPreconditionsAsync(Context).ConfigureAwait(false);
-                if (result.IsSuccess)
-                    description += $"{cmd.Aliases[0]}\n";
+            switch (pageNumber)
+            {
+                case 1:
+                    builder.Description = "BatchEditingModule:\n- batchinfo\n- batchvalidate\n\nLegalityCheckModule:\n- lc\n- lcv\n\nHelloModule:\n- hello";
+                    break;
+                case 2:
+                    builder.Description = "HelpModule:\n- help\n\nPingModule:\n- ping\n\nThankfulModule:\n- thankyou";
+                    break;
+                // Add cases for other pages...
+                default:
+                    builder.Description = "Invalid page number.";
+                    break;
             }
-            if (string.IsNullOrWhiteSpace(description))
-                continue;
 
-            var moduleName = module.Name;
-            var gen = moduleName.IndexOf('`');
-            if (gen != -1)
-                moduleName = moduleName[..gen];
-
-            builder.AddField(x =>
+            if (_helpMessage == null)
             {
-                x.Name = moduleName;
-                x.Value = description;
-                x.IsInline = false;
-            });
-        }
+                _helpMessage = await ReplyAsync("Help has arrived!", false, builder.Build());
+                foreach (var emoji in _pageEmojis)
+                {
+                    await _helpMessage.AddReactionAsync(emoji);
+                }
 
-        await ReplyAsync("Help has arrived!", false, builder.Build()).ConfigureAwait(false);
-    }
-
-    [Command("help")]
-    [Summary("Lists information about a specific command.")]
-    public async Task HelpAsync([Summary("The command you want help for")] string command)
-    {
-        var result = Service.Search(Context, command);
-
-        if (!result.IsSuccess)
-        {
-            await ReplyAsync($"Sorry, I couldn't find a command like **{command}**.").ConfigureAwait(false);
-            return;
-        }
-
-        var builder = new EmbedBuilder
-        {
-            Color = new Color(114, 137, 218),
-            Description = $"Here are some commands like **{command}**:",
-        };
-
-        foreach (var match in result.Commands)
-        {
-            var cmd = match.Command;
-
-            builder.AddField(x =>
+                var client = Context.Client as DiscordSocketClient;
+                client.ReactionAdded += HandleReactionAsync;
+                client.InteractionCreated += HandleInteractionAsync;
+            }
+            else
             {
-                x.Name = string.Join(", ", cmd.Aliases);
-                x.Value = GetCommandSummary(cmd);
-                x.IsInline = false;
-            });
+                await _helpMessage.ModifyAsync(msg =>
+                {
+                    msg.Embed = builder.Build();
+                    msg.Content = "Help has arrived!";
+                });
+            }
         }
 
-        await ReplyAsync("Help has arrived!", false, builder.Build()).ConfigureAwait(false);
-    }
+        private Task HandleReactionAsync(Cacheable<IUserMessage, ulong> cacheable1, Cacheable<IMessageChannel, ulong> cacheable2, SocketReaction reaction)
+        {
+            throw new NotImplementedException();
+        }
 
-    private static string GetCommandSummary(CommandInfo cmd)
-    {
-        return $"Summary: {cmd.Summary}\nParameters: {GetParameterSummary(cmd.Parameters)}";
-    }
+        private async Task HandleReactionAsync(Cacheable<IUserMessage, ulong> cache, ISocketMessageChannel channel, SocketReaction reaction)
+        {
+            if (reaction.UserId == Context.Client.CurrentUser.Id || reaction.MessageId != _helpMessage.Id)
+                return;
 
-    private static string GetParameterSummary(IReadOnlyList<ParameterInfo> p)
-    {
-        if (p.Count == 0)
-            return "None";
-        return $"{p.Count}\n- " + string.Join("\n- ", p.Select(GetParameterSummary));
-    }
+            var emoji = reaction.Emote;
 
-    private static string GetParameterSummary(ParameterInfo z)
-    {
-        var result = z.Name;
-        if (!string.IsNullOrWhiteSpace(z.Summary))
-            result += $" ({z.Summary})";
-        return result;
+            if (_pageEmojis.Contains(emoji))
+            {
+                int newPage = _currentPage;
+
+                if (emoji.Name == "⬅️" && _currentPage > 1)
+                    newPage--;
+                else if (emoji.Name == "➡️" && _currentPage < MaxPageNumber()) // Define MaxPageNumber() method to return the total number of pages
+                    newPage++;
+
+                if (newPage != _currentPage)
+                {
+                    _currentPage = newPage;
+                    await ShowHelpPage(_currentPage);
+                }
+
+                await _helpMessage.RemoveReactionAsync(emoji, reaction.User.Value);
+            }
+        }
+
+        private async Task HandleInteractionAsync(SocketInteraction interaction)
+        {
+            if (interaction is SocketMessageComponent component)
+            {
+                if (component.Data.CustomId == "declineBtn" && component.Message.Id == _helpMessage.Id)
+                {
+                    var builder = new EmbedBuilder
+                    {
+                        Color = new Color(114, 137, 218),
+                        Title = "Help Page",
+                        Description = "Your new content here"
+                    };
+
+                    await component.Message.ModifyAsync(msg => msg.Embed = builder.Build());
+                }
+            }
+        }
+
+        private int MaxPageNumber()
+        {
+            // Return the total number of pages
+            return 2; // Adjust this according to the total number of pages
+        }
     }
 }
